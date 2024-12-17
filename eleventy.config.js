@@ -1,10 +1,15 @@
 /**
 * Eleventy Configuration
 */
+import EleventyVitePlugin from "@11ty/eleventy-plugin-vite";
+
 // imports here
 export default function (eleventyConfig) {
   // We will add our configuration here
+  eleventyConfig.addPlugin(EleventyVitePlugin);
+
 };
+
 export const config = {
   // Control which files Eleventy will process
   // e.g.: *.md, *.njk, *.html, *.liquid
