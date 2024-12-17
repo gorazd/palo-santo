@@ -13,7 +13,8 @@
   "license": "ISC",
   "dependencies": {
     "@11ty/eleventy": "^3.0.0",
-    "@11ty/eleventy-plugin-vite": "^5.0.2"
+    "@11ty/eleventy-plugin-vite": "^5.0.2",
+    "three": "^0.171.0"
   },
   "type": "module"
 }

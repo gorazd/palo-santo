@@ -7,7 +7,9 @@ import EleventyVitePlugin from "@11ty/eleventy-plugin-vite";
 export default function (eleventyConfig) {
   // We will add our configuration here
   eleventyConfig.addPlugin(EleventyVitePlugin);
-
+  
+  // Add passthrough copy for JavaScript files
+  eleventyConfig.addPassthroughCopy("content/**/*.js");
 };
 
 export const config = {
