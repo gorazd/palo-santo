@@ -10,6 +10,8 @@ export default function (eleventyConfig) {
   
   // Add passthrough copy for JavaScript files
   eleventyConfig.addPassthroughCopy("content/**/*.js");
+  eleventyConfig.addPassthroughCopy("content/**/*.glb");
+  eleventyConfig.addPassthroughCopy({"./public": ""});
 };
 
 export const config = {
