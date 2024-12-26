@@ -2,13 +2,96 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// Load a texture
+// Load textures
 const textureLoader = new THREE.TextureLoader();
+const noiseTexture = textureLoader.load('https://threejs.org/examples/textures/noises/perlin/128x128.png');
+noiseTexture.wrapS = THREE.RepeatWrapping;
+noiseTexture.wrapT = THREE.RepeatWrapping;
+
 const texture = textureLoader.load('/come-mandare-il-cv-a-ikea.jpg');
 const textureWood = textureLoader.load('/wood-3.jpg');
 
+// Smoke state
+let smokeEnabled = true;
+
 // Create a scene
 const scene = new THREE.Scene();
+
+// Add axes helper
+const axesHelper = new THREE.AxesHelper(5);
+scene.add(axesHelper);
+
+// Create smoke geometry and material
+const smokeGeometry = new THREE.PlaneGeometry(0.15, 0.6, 16, 64);
+smokeGeometry.translate(0, 0.3, 0);
+smokeGeometry.scale(1.5, 6, 1.5);
+
+const smokeMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    uniforms: {
+        time: { value: 0 },
+        noiseTexture: { value: noiseTexture }
+    },
+    vertexShader: `
+        varying vec2 vUv;
+        uniform float time;
+        uniform sampler2D noiseTexture;
+        
+        void main() {
+            vUv = uv;
+            
+            // Add some movement
+            vec4 noise = texture2D(noiseTexture, vec2(
+                6.75,
+                uv.y * 0.25 - time * 0.025
+            ));
+            
+            // Twist effect
+            float twist = noise.r * 25.0;
+            vec3 pos = position;
+            float c = cos(twist);
+            float s = sin(twist);
+            pos.x = position.x * c - position.z * s;
+            pos.z = position.x * s + position.z * c;
+            
+            // Wind effect
+            vec2 wind = vec2(
+                texture2D(noiseTexture, vec2(0.25, time * 0.01)).r - 0.5,
+                texture2D(noiseTexture, vec2(0.75, time * 0.01)).r - 0.5
+            );
+            pos.xz += wind * pow(uv.y, 1.0);
+            
+            // Scale based on distance from origin
+            float distanceScale = 1.0 + (uv.y * 2.0); // Increase scale linearly with height
+            pos.xz *= distanceScale;
+            
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.1);
+        }
+    `,
+    fragmentShader: `
+        varying vec2 vUv;
+        uniform float time;
+        uniform sampler2D noiseTexture;
+        
+        void main() {
+            vec2 uv = vec2(vUv.x * 0.5, vUv.y * 0.3 - time * 0.03);
+            float alpha = texture2D(noiseTexture, uv).r;
+            
+            // Edge fade
+            alpha *= smoothstep(0.0, 0.1, vUv.x);
+            alpha *= smoothstep(0.0, 0.1, 1.0 - vUv.x);
+            alpha *= smoothstep(0.0, 0.1, vUv.y);
+            alpha *= smoothstep(0.0, 0.1, 1.0 - vUv.y);
+            
+            vec3 color = mix(vec3(0.3, 0.3, 0.3), vec3(1.0), pow(alpha, 3.0));
+            gl_FragColor = vec4(color, alpha * 0.9);
+        }
+    `
+});
+
+const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial);
 scene.background = new THREE.Color(0xffffff);
 
 // Create a camera with perspective view
@@ -52,10 +135,13 @@ camera.position.x = 2;
 camera.position.y = 7;
 
 // Animation loop function
-function animate() {
-	renderer.render( scene, camera );
+function animate(time) {
+    if (smokeMaterial && smokeEnabled) {
+        smokeMaterial.uniforms.time.value = time * 0.001;
+    }
+    renderer.render(scene, camera);
 }
-renderer.setAnimationLoop( animate );
+renderer.setAnimationLoop(animate);
 
 // Add orbit controls to allow user interaction
 const controls = new OrbitControls( camera, renderer.domElement );
@@ -91,6 +177,12 @@ const colorToHex = (color) => {
   return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2];
 };
 // end CSS
+
+// Toggle smoke function
+window.toggleSmoke = function() {
+    smokeEnabled = !smokeEnabled;
+    smoke.visible = smokeEnabled;
+};
 
 gltfLoader.load('01-palo-santo.glb', function(gltf) {
 	try {
@@ -170,7 +262,21 @@ gltfLoader.load('01-palo-santo.glb', function(gltf) {
 
 		// Add separated meshes to the scene
 		if (packaging) scene.add(packaging);
-		if (spinelloGroup.children.length > 0) scene.add(spinelloGroup);
+		if (spinelloGroup.children.length > 0) {
+            scene.add(spinelloGroup);
+            
+            // Position smoke at joint tip
+            const jointTip = spinelloGroup.children[1]; // Index 1 should be the joint tip
+            if (jointTip) {
+                smoke.position.copy(jointTip.position);
+                smoke.position.y += 0.15; // Adjust height as needed
+                smoke.position.x -= 0.05; // Adjust height as needed
+                smoke.position.z -= 0.6; // Adjust height as needed
+                // smoke.rotation.y = Math.PI / 2; // Rotate to face camera better
+                smoke.rotation.z = Math.PI / 2; // Rotate to face camera better
+                scene.add(smoke);
+            }
+        }
 	} catch (error) {
 		console.error('An error occurred while processing the model:', error);
 	}
